@@ -3,9 +3,319 @@
 <head>
 <meta charset="UTF-8">
 <title>무림대전</title>
+<style>
+body{
+background:#111;
+color:white;
+font-family:sans-serif;
+padding:15px;
+}
+button{
+padding:12px;
+margin:5px;
+font-size:18px;
+}
+.card{
+border:1px solid #666;
+padding:10px;
+margin:5px 0;
+}
+#log{
+height:250px;
+overflow:auto;
+background:black;
+padding:10px;
+white-space:pre-line;
+}
+</style>
 </head>
 <body>
+
 <h1>⚔ 무림대전 ⚔</h1>
-<p>게임이 정상적으로 실행됩니다.</p>
+
+<div id="info"></div>
+
+<h2>내 무인</h2>
+<div id="team"></div>
+
+<h2>상점</h2>
+<div id="shop"></div>
+
+<button onclick="refreshShop()">
+상점 새로고침 (2냥)
+</button>
+
+<button onclick="battle()">
+전투 시작
+</button>
+
+<h2>로그</h2>
+<div id="log"></div>
+
+<script>
+
+let hp=100;
+let gold=10;
+let round=1;
+
+const unitData=[
+{
+name:"하급 검객",
+cost:1,
+hp:120,
+atk:20
+},
+{
+name:"소림 승려",
+cost:1,
+hp:150,
+atk:15
+},
+{
+name:"혈교 무사",
+cost:2,
+hp:180,
+atk:30
+},
+{
+name:"흑풍 자객",
+cost:3,
+hp:140,
+atk:45
+}
+];
+
+let team=[];
+
+function log(t){
+let l=document.getElementById("log");
+l.innerHTML+=t+"<br>";
+l.scrollTop=l.scrollHeight;
+}
+
+function update(){
+
+document.getElementById("info").innerHTML=
+`
+❤️ 체력 ${hp}<br>
+💰 은자 ${gold}<br>
+🏆 라운드 ${round}
+`;
+
+let t=document.getElementById("team");
+t.innerHTML="";
+
+if(team.length===0){
+t.innerHTML="무인이 없습니다.";
+}
+
+team.forEach((u)=>{
+
+t.innerHTML+=`
+<div class="card">
+${u.name} ⭐${u.star}<br>
+체력 ${u.hp}<br>
+공격 ${u.atk}
+</div>
+`;
+
+});
+
+}
+
+function refreshShop(){
+
+if(gold>=2){
+gold-=2;
+}
+
+let s=document.getElementById("shop");
+s.innerHTML="";
+
+for(let i=0;i<3;i++){
+
+let u=
+unitData[
+Math.floor(
+Math.random()*unitData.length
+)
+];
+
+s.innerHTML+=`
+<div class="card">
+${u.name}<br>
+비용 ${u.cost}냥<br>
+<button
+onclick="buy('${u.name}')">
+구매
+</button>
+</div>
+`;
+}
+
+update();
+}
+
+function buy(name){
+
+let u=
+unitData.find(
+x=>x.name===name
+);
+
+if(gold<u.cost){
+log("은자가 부족합니다.");
+return;
+}
+
+gold-=u.cost;
+
+team.push({
+name:u.name,
+cost:u.cost,
+hp:u.hp,
+atk:u.atk,
+star:1
+});
+
+log(u.name+" 영입!");
+
+upgrade();
+
+update();
+}
+
+function upgrade(){
+
+let names={};
+
+team.forEach(u=>{
+
+let key=u.name+"_"+u.star;
+
+if(!names[key]){
+names[key]=[];
+}
+
+names[key].push(u);
+
+});
+
+for(let key in names){
+
+if(names[key].length>=3){
+
+let list=names[key];
+
+for(let i=0;i<3;i++){
+
+let idx=
+team.indexOf(list[i]);
+
+team.splice(idx,1);
+}
+
+let base=list[0];
+
+team.push({
+name:base.name,
+cost:base.cost,
+hp:base.hp*2,
+atk:base.atk*2,
+star:base.star+1
+});
+
+log(
+base.name+
+" ⭐"+
+(base.star+1)+
+" 승급!"
+);
+
+upgrade();
+return;
+}
+
+}
+
+}
+
+function battle(){
+
+if(team.length===0){
+log("무인이 없습니다.");
+return;
+}
+
+let enemyHp=
+100+
+round*40;
+
+let enemyAtk=
+15+
+round*5;
+
+let myAtk=0;
+
+team.forEach(u=>{
+myAtk+=u.atk;
+});
+
+log("===== 전투 시작 =====");
+log("적 체력 "+enemyHp);
+
+while(enemyHp>0){
+
+enemyHp-=myAtk;
+
+log(
+"아군 공격 "+
+myAtk+
+" 피해!"
+);
+
+if(enemyHp<=0){
+break;
+}
+
+hp-=enemyAtk;
+
+log(
+"적 공격 "+
+enemyAtk+
+" 피해!"
+);
+
+if(hp<=0){
+
+alert(
+"패배!\n"+
+round+
+"라운드 도달"
+);
+
+location.reload();
+return;
+}
+
+}
+
+gold+=5;
+round++;
+
+log("승리!");
+log("은자 5냥 획득");
+
+update();
+refreshShop();
+
+}
+
+update();
+
+refreshShop();
+
+</script>
+
 </body>
 </html>
