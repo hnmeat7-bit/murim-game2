@@ -1552,3 +1552,293 @@ if(d)player=d;
 
 </body>
 </html>
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>전설 무인 - CHARACTER UPDATE</title>
+
+<style>
+body{
+margin:0;
+overflow:hidden;
+background:#0b0b12;
+font-family:Arial;
+color:white;
+}
+
+canvas{
+position:absolute;
+top:0;
+left:0;
+background:#111;
+}
+
+#ui{
+position:fixed;
+top:10px;
+left:10px;
+z-index:10;
+}
+
+button{
+margin:3px;
+padding:8px;
+background:#222;
+color:white;
+border:1px solid #444;
+cursor:pointer;
+}
+
+button:hover{background:#333;}
+
+#stats{
+position:fixed;
+bottom:10px;
+left:10px;
+}
+.bar{
+width:180px;
+height:10px;
+background:#333;
+margin-top:5px;
+}
+.hp{background:red;height:10px;}
+.mp{background:blue;height:10px;}
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+<button onclick="startGame()">START</button>
+</div>
+
+<canvas id="c"></canvas>
+
+<div id="stats">
+HP
+<div class="bar"><div id="hp" class="hp"></div></div>
+MP
+<div class="bar"><div id="mp" class="mp"></div></div>
+킬: <span id="kill">0</span>
+</div>
+
+<script>
+const c=document.getElementById("c");
+const ctx=c.getContext("2d");
+c.width=innerWidth;
+c.height=innerHeight;
+
+let player={
+x:200,y:200,
+hp:100,mp:50,
+dir:0,
+hit:false
+};
+
+let enemies=[];
+let bullets=[];
+let boss=null;
+let kill=0;
+
+class Enemy{
+constructor(x,y,hp=30,type="mob"){
+this.x=x;
+this.y=y;
+this.hp=hp;
+this.type=type;
+this.alive=true;
+this.hitFlash=0;
+}
+
+update(){
+if(!this.alive)return;
+
+let dx=player.x-this.x;
+let dy=player.y-this.y;
+let d=Math.hypot(dx,dy);
+
+this.x+=dx/d*0.7;
+this.y+=dy/d*0.7;
+
+if(d<25)player.hp-=0.3;
+}
+
+draw(){
+if(!this.alive)return;
+
+this.hitFlash--;
+
+ctx.save();
+ctx.translate(this.x,this.y);
+
+// 보스는 크고 보라색
+if(this.type==="boss"){
+ctx.fillStyle="purple";
+ctx.fillRect(-15,-15,30,30);
+}else{
+ctx.fillStyle=this.hitFlash>0?"white":"red";
+ctx.fillRect(-10,-10,20,20);
+}
+
+ctx.restore();
+}
+}
+
+class Bullet{
+constructor(x,y,tx,ty){
+this.x=x;
+this.y=y;
+let dx=tx-x;
+let dy=ty-y;
+let d=Math.hypot(dx,dy);
+this.vx=dx/d*9;
+this.vy=dy/d*9;
+this.life=50;
+}
+
+update(){
+this.x+=this.vx;
+this.y+=this.vy;
+this.life--;
+}
+
+draw(){
+ctx.fillStyle="yellow";
+ctx.fillRect(this.x,this.y,4,4);
+}
+}
+
+// 🎮 캐릭터 그리기 (핵심 업그레이드)
+function drawPlayer(){
+ctx.save();
+ctx.translate(player.x,player.y);
+
+// 방향 살짝 흔들림
+let bob=Math.sin(Date.now()/100)*2;
+
+// 몸
+ctx.fillStyle="#00c8ff";
+ctx.fillRect(-10, -10 + bob, 20, 25);
+
+// 머리
+ctx.fillStyle="#ffd7a0";
+ctx.beginPath();
+ctx.arc(0,-18 + bob,8,0,Math.PI*2);
+ctx.fill();
+
+// 눈
+ctx.fillStyle="black";
+ctx.fillRect(-3,-20 + bob,2,2);
+ctx.fillRect(3,-20 + bob,2,2);
+
+ctx.restore();
+}
+
+function spawnEnemy(){
+enemies.push(new Enemy(
+Math.random()*c.width,
+Math.random()*c.height
+));
+}
+
+function spawnBoss(){
+boss=new Enemy(c.width/2,c.height/2,300,"boss");
+}
+
+function startGame(){
+enemies=[];
+bullets=[];
+kill=0;
+boss=null;
+
+for(let i=0;i<6;i++)spawnEnemy();
+
+loop();
+}
+
+function loop(){
+ctx.clearRect(0,0,c.width,c.height);
+
+// player
+drawPlayer();
+
+// enemies
+enemies.forEach(e=>{
+e.update();
+e.draw();
+});
+
+// boss
+if(boss){
+boss.update();
+boss.draw();
+}
+
+// bullets
+bullets.forEach((b,i)=>{
+b.update();
+b.draw();
+
+let targets=[...enemies];
+if(boss)targets.push(boss);
+
+targets.forEach(t=>{
+if(!t.alive)return;
+
+if(b.x>t.x-10&&b.x<t.x+10&&b.y>t.y-10&&b.y<t.y+10){
+t.hp-=10;
+b.life=0;
+t.hitFlash=5;
+
+if(t.hp<=0 && t.alive){
+t.alive=false;
+kill++;
+}
+}
+});
+
+if(b.life<=0)bullets.splice(i,1);
+});
+
+// boss spawn
+if(kill>=10 && !boss){
+spawnBoss();
+}
+
+// UI
+document.getElementById("hp").style.width=player.hp+"%";
+document.getElementById("mp").style.width=player.mp+"%";
+document.getElementById("kill").innerText=kill;
+
+// death check
+if(player.hp<=0){
+ctx.fillStyle="rgba(0,0,0,0.6)";
+ctx.fillRect(0,0,c.width,c.height);
+ctx.fillStyle="white";
+ctx.font="40px Arial";
+ctx.fillText("YOU DIED",c.width/2-100,c.height/2);
+return;
+}
+
+requestAnimationFrame(loop);
+}
+
+// movement
+addEventListener("keydown",e=>{
+if(e.key==="w")player.y-=10;
+if(e.key==="s")player.y+=10;
+if(e.key==="a")player.x-=10;
+if(e.key==="d")player.x+=10;
+});
+
+// attack
+c.addEventListener("click",e=>{
+bullets.push(new Bullet(player.x,player.y,e.clientX,e.clientY));
+});
+</script>
+
+</body>
+</html>
