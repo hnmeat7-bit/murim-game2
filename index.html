@@ -319,3 +319,396 @@ refreshShop();
 
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>무림대전</title>
+<style>
+body{
+    background:#111;
+    color:#fff;
+    font-family:sans-serif;
+    margin:20px;
+}
+button{
+    padding:10px;
+    margin:5px;
+    font-size:16px;
+}
+.card{
+    border:1px solid #666;
+    padding:10px;
+    margin:5px;
+    display:inline-block;
+    width:180px;
+}
+#log{
+    background:#000;
+    height:250px;
+    overflow:auto;
+    padding:10px;
+    white-space:pre-line;
+}
+</style>
+</head>
+<body>
+
+<h1>⚔ 무림대전 ⚔</h1>
+
+<div id="info"></div>
+
+<button onclick="buyExp()">경험치 구매 (4냥)</button>
+<button onclick="refreshShop()">상점 새로고침 (2냥)</button>
+<button onclick="battle()">전투 시작</button>
+<button onclick="undo()">↩ 뒤로가기</button>
+
+<h2>내 무인</h2>
+<div id="team"></div>
+
+<h2>상점</h2>
+<div id="shop"></div>
+
+<h2>로그</h2>
+<div id="log"></div>
+
+<script>
+
+let hp=100;
+let gold=10;
+let round=1;
+let level=1;
+let exp=0;
+let expNeed=4;
+
+let history=[];
+let currentShop=[];
+
+const unitData=[
+{name:"하급 검객",cost:1,hp:120,atk:20,tribe:"검객"},
+{name:"소림 승려",cost:1,hp:150,atk:15,tribe:"소림"},
+{name:"견습 도사",cost:1,hp:100,atk:18,tribe:"도사"},
+{name:"혈교 무사",cost:2,hp:180,atk:30,tribe:"마교"},
+{name:"청성 검사",cost:2,hp:170,atk:35,tribe:"검객"},
+{name:"흑풍 자객",cost:3,hp:180,atk:50,tribe:"마교"},
+{name:"무당 장로",cost:3,hp:240,atk:35,tribe:"도사"},
+{name:"소림 방장",cost:4,hp:400,atk:60,tribe:"소림"},
+{name:"화산 장문인",cost:4,hp:300,atk:80,tribe:"검객"},
+{name:"천마",cost:5,hp:700,atk:130,tribe:"마교"},
+{name:"장삼봉",cost:5,hp:900,atk:100,tribe:"도사"},
+{name:"독고구검",cost:5,hp:600,atk:160,tribe:"검객"}
+];
+
+let team=[];
+
+function log(t){
+    let l=document.getElementById("log");
+    l.innerHTML+=t+"<br>";
+    l.scrollTop=l.scrollHeight;
+}
+
+function saveState(){
+    history.push(JSON.stringify({
+        hp,gold,round,
+        level,exp,expNeed,
+        team,
+        currentShop
+    }));
+
+    if(history.length>20)
+        history.shift();
+}
+
+function undo(){
+    if(history.length===0){
+        log("되돌릴 수 없습니다.");
+        return;
+    }
+
+    let s=JSON.parse(history.pop());
+
+    hp=s.hp;
+    gold=s.gold;
+    round=s.round;
+    level=s.level;
+    exp=s.exp;
+    expNeed=s.expNeed;
+    team=s.team;
+    currentShop=s.currentShop;
+
+    update();
+    drawShop();
+
+    log("↩ 되돌리기");
+}
+
+function update(){
+
+document.getElementById("info").innerHTML=
+`
+❤️ 체력 ${hp}<br>
+💰 은자 ${gold}<br>
+🏆 라운드 ${round}<br>
+⭐ 레벨 ${level}<br>
+📚 경험치 ${exp}/${expNeed}<br>
+👥 배치 ${team.length}/${level}
+`;
+
+let t=document.getElementById("team");
+t.innerHTML="";
+
+if(team.length===0){
+    t.innerHTML="무인이 없습니다.";
+}
+
+team.forEach(u=>{
+    t.innerHTML+=`
+    <div class="card">
+    ${u.name} ⭐${u.star}<br>
+    ${u.tribe}<br>
+    체력 ${u.hp}<br>
+    공격 ${u.atk}
+    </div>`;
+});
+}
+
+function drawShop(){
+
+let s=document.getElementById("shop");
+s.innerHTML="";
+
+currentShop.forEach(u=>{
+s.innerHTML+=`
+<div class="card">
+${u.name}<br>
+${u.tribe}<br>
+비용 ${u.cost}냥<br>
+<button onclick="buy('${u.name}')">
+구매
+</button>
+</div>`;
+});
+}
+
+function refreshShop(){
+
+saveState();
+
+if(gold>=2)
+    gold-=2;
+
+currentShop=[];
+
+for(let i=0;i<5;i++){
+
+let u=
+unitData[
+Math.floor(Math.random()*unitData.length)
+];
+
+currentShop.push(u);
+}
+
+drawShop();
+update();
+}
+
+function buy(name){
+
+if(team.length>=level){
+    log("배치 공간이 부족합니다.");
+    return;
+}
+
+let u=
+unitData.find(x=>x.name===name);
+
+if(gold<u.cost){
+    log("은자가 부족합니다.");
+    return;
+}
+
+saveState();
+
+gold-=u.cost;
+
+team.push({
+name:u.name,
+cost:u.cost,
+hp:u.hp,
+atk:u.atk,
+tribe:u.tribe,
+star:1
+});
+
+log(u.name+" 영입");
+
+upgrade();
+
+update();
+}
+
+function upgrade(){
+
+let map={};
+
+team.forEach(u=>{
+
+let k=u.name+"_"+u.star;
+
+if(!map[k])
+    map[k]=[];
+
+map[k].push(u);
+
+});
+
+for(let k in map){
+
+if(map[k].length>=3){
+
+let list=map[k];
+
+for(let i=0;i<3;i++){
+
+let idx=
+team.indexOf(list[i]);
+
+team.splice(idx,1);
+}
+
+let b=list[0];
+
+team.push({
+name:b.name,
+cost:b.cost,
+hp:b.hp*2,
+atk:b.atk*2,
+tribe:b.tribe,
+star:b.star+1
+});
+
+log(
+b.name+
+" ⭐"+
+(b.star+1)+
+" 승급!"
+);
+
+upgrade();
+return;
+}
+
+}
+
+}
+
+function buyExp(){
+
+if(gold<4)
+    return;
+
+saveState();
+
+gold-=4;
+exp+=4;
+
+if(exp>=expNeed){
+    exp-=expNeed;
+    level++;
+    expNeed+=2;
+
+    log(
+    "레벨 "+
+    level+
+    " 달성!"
+    );
+}
+
+update();
+}
+
+function synergyAtk(){
+
+let count={};
+
+team.forEach(u=>{
+count[u.tribe]=
+(count[u.tribe]||0)+1;
+});
+
+let bonus=0;
+
+if(count["검객"]>=3)
+    bonus+=20;
+
+if(count["마교"]>=2)
+    bonus+=30;
+
+return bonus;
+}
+
+function battle(){
+
+if(team.length===0){
+    log("무인이 없습니다.");
+    return;
+}
+
+let enemyHp=
+150+round*80;
+
+let enemyAtk=
+20+round*10;
+
+let atk=0;
+
+team.forEach(u=>{
+atk+=u.atk;
+});
+
+atk+=synergyAtk();
+
+log("===== 전투 시작 =====");
+log("적 체력 "+enemyHp);
+
+while(enemyHp>0){
+
+enemyHp-=atk;
+
+if(enemyHp<=0)
+    break;
+
+hp-=enemyAtk;
+
+if(hp<=0){
+
+alert(
+"패배!\n"+
+round+
+"라운드 도달"
+);
+
+location.reload();
+return;
+}
+
+}
+
+gold+=5;
+round++;
+
+log("승리!");
+log("은자 5냥 획득");
+
+update();
+refreshShop();
+}
+
+update();
+refreshShop();
+
+</script>
+
+</body>
+</html>
