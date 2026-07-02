@@ -956,3 +956,316 @@ createInventory();
 
 </body>
 </html>
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>전설 무인 RPG - FULL</title>
+
+<style>
+body {
+  margin:0;
+  background:#0b0b12;
+  overflow:hidden;
+  font-family:Arial;
+  color:white;
+}
+
+#ui {
+  position:fixed;
+  top:10px;
+  left:10px;
+  z-index:10;
+}
+
+button {
+  margin:3px;
+  padding:8px;
+  background:#222;
+  color:white;
+  border:1px solid #444;
+  cursor:pointer;
+}
+
+button:hover { background:#333; }
+
+#gameCanvas {
+  position:absolute;
+  top:0;
+  left:0;
+  background:#111;
+}
+
+#stats {
+  position:fixed;
+  bottom:10px;
+  left:10px;
+  font-size:14px;
+}
+
+.bar {
+  width:200px;
+  height:10px;
+  background:#333;
+  margin-top:5px;
+}
+
+.hp { background:red; height:10px; }
+.mp { background:blue; height:10px; }
+
+#inventory {
+  position:fixed;
+  right:10px;
+  bottom:10px;
+  display:flex;
+  gap:5px;
+}
+
+.item {
+  width:45px;
+  height:45px;
+  background:#2a2a2a;
+  border:1px solid #555;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  cursor:pointer;
+  font-size:12px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+  <button onclick="startGame()">START</button>
+  <button onclick="spawnBoss()">BOSS</button>
+  <button onclick="saveGame()">SAVE</button>
+  <button onclick="loadGame()">LOAD</button>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<div id="stats">
+  HP <div class="bar"><div id="hpBar" class="hp"></div></div>
+  MP <div class="bar"><div id="mpBar" class="mp"></div></div>
+  LVL: <span id="lvl">1</span>
+</div>
+
+<div id="inventory"></div>
+
+<script>
+const c=document.getElementById("gameCanvas");
+const ctx=c.getContext("2d");
+c.width=innerWidth;
+c.height=innerHeight;
+
+let player={
+x:200,y:200,
+hp:100,mp:50,
+lvl:1,xp:0,
+atk:10
+};
+
+let enemies=[];
+let boss=null;
+let bullets=[];
+let particles=[];
+
+function Enemy(x,y,hp=30,type="mob"){
+this.x=x;this.y=y;
+this.hp=hp;
+this.type=type;
+this.alive=true;
+}
+
+Enemy.prototype.update=function(){
+if(!this.alive)return;
+let dx=player.x-this.x;
+let dy=player.y-this.y;
+let d=Math.hypot(dx,dy);
+
+if(d>1){
+this.x+=dx/d*0.8;
+this.y+=dy/d*0.8;
+}
+
+if(d<25){
+player.hp-=0.3;
+}
+};
+
+Enemy.prototype.draw=function(){
+if(!this.alive)return;
+ctx.fillStyle=this.type==="boss"?"purple":"red";
+ctx.fillRect(this.x,this.y,20,20);
+};
+
+function Bullet(x,y,tx,ty,skill=false){
+this.x=x;this.y=y;
+let dx=tx-x,dy=ty-y;
+let d=Math.hypot(dx,dy);
+this.vx=dx/d*8;
+this.vy=dy/d*8;
+this.life=60;
+this.skill=skill;
+}
+
+Bullet.prototype.update=function(){
+this.x+=this.vx;
+this.y+=this.vy;
+this.life--;
+if(this.skill){
+particles.push({x:this.x,y:this.y,life:10});
+}
+};
+
+Bullet.prototype.draw=function(){
+ctx.fillStyle=this.skill?"cyan":"yellow";
+ctx.fillRect(this.x,this.y,5,5);
+};
+
+function spawnEnemy(){
+enemies.push(new Enemy(
+Math.random()*c.width,
+Math.random()*c.height
+));
+}
+
+function spawnBoss(){
+boss=new Enemy(
+c.width/2,c.height/2,
+300,"boss"
+);
+}
+
+function levelUp(){
+if(player.xp>=100){
+player.xp=0;
+player.lvl++;
+player.atk+=2;
+player.hp=100;
+}
+}
+
+function updateUI(){
+document.getElementById("hpBar").style.width=player.hp+"%";
+document.getElementById("mpBar").style.width=player.mp+"%";
+document.getElementById("lvl").innerText=player.lvl;
+}
+
+function skill(){
+if(player.mp>=10){
+player.mp-=10;
+for(let i=0;i<8;i++){
+bullets.push(new Bullet(
+player.x,player.y,
+player.x+Math.cos(i)*100,
+player.y+Math.sin(i)*100,
+true
+));
+}
+}
+}
+
+function startGame(){
+for(let i=0;i<6;i++)spawnEnemy();
+loop();
+}
+
+function loop(){
+ctx.clearRect(0,0,c.width,c.height);
+
+// player
+ctx.fillStyle="cyan";
+ctx.fillRect(player.x,player.y,20,20);
+
+// enemies
+enemies.forEach(e=>{
+e.update();e.draw();
+});
+
+// boss
+if(boss){
+boss.update();boss.draw();
+}
+
+// bullets
+bullets.forEach((b,i)=>{
+b.update();b.draw();
+
+let targets=[...enemies];
+if(boss)targets.push(boss);
+
+targets.forEach(t=>{
+if(!t.alive)return;
+if(b.x>t.x&&b.x<t.x+20&&b.y>t.y&&b.y<t.y+20){
+t.hp-=player.atk;
+b.life=0;
+
+if(t.hp<=0){
+t.alive=false;
+player.xp+=20;
+}
+}
+});
+
+if(b.life<=0)bullets.splice(i,1);
+});
+
+// particles
+particles.forEach((p,i)=>{
+ctx.fillStyle="rgba(0,255,255,0.5)";
+ctx.fillRect(p.x,p.y,3,3);
+p.life--;
+if(p.life<=0)particles.splice(i,1);
+});
+
+// level check
+levelUp();
+updateUI();
+
+requestAnimationFrame(loop);
+}
+
+// movement
+addEventListener("keydown",e=>{
+if(e.key==="w")player.y-=10;
+if(e.key==="s")player.y+=10;
+if(e.key==="a")player.x-=10;
+if(e.key==="d")player.x+=10;
+
+if(e.key===" ")skill();
+});
+
+// attack
+c.addEventListener("click",e=>{
+bullets.push(new Bullet(player.x,player.y,e.clientX,e.clientY));
+});
+
+// save/load
+function saveGame(){
+localStorage.setItem("save",JSON.stringify(player));
+}
+
+function loadGame(){
+let d=JSON.parse(localStorage.getItem("save"));
+if(d)player=d;
+}
+
+// inventory
+function createInv(){
+let inv=document.getElementById("inventory");
+for(let i=0;i<5;i++){
+let it=document.createElement("div");
+it.className="item";
+it.innerText="템"+i;
+inv.appendChild(it);
+}
+}
+createInv();
+</script>
+
+</body>
+</html>
