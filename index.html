@@ -1269,3 +1269,286 @@ createInv();
 
 </body>
 </html>
+
+🎮 🔥 전설 무인 (친구용 완성 통합 버전)
+
+👉 그대로 index.html로 저장하면 실행됨
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>전설 무인 - TIME KILL GAME</title>
+
+<style>
+body{
+margin:0;
+background:#0b0b12;
+overflow:hidden;
+font-family:Arial;
+color:white;
+}
+
+#ui{
+position:fixed;
+top:10px;
+left:10px;
+z-index:10;
+}
+
+button{
+margin:3px;
+padding:8px;
+background:#222;
+color:white;
+border:1px solid #444;
+cursor:pointer;
+}
+
+button:hover{background:#333;}
+
+canvas{
+position:absolute;
+top:0;
+left:0;
+background:#111;
+}
+
+#stats{
+position:fixed;
+bottom:10px;
+left:10px;
+font-size:14px;
+}
+
+.bar{
+width:200px;
+height:10px;
+background:#333;
+margin-top:5px;
+}
+
+.hp{background:red;height:10px;}
+.mp{background:blue;height:10px;}
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+<button onclick="startGame()">START</button>
+<button onclick="saveGame()">SAVE</button>
+<button onclick="loadGame()">LOAD</button>
+</div>
+
+<canvas id="c"></canvas>
+
+<div id="stats">
+HP
+<div class="bar"><div id="hpBar" class="hp"></div></div>
+MP
+<div class="bar"><div id="mpBar" class="mp"></div></div>
+킬: <span id="kill">0</span> / 10
+</div>
+
+<script>
+const c=document.getElementById("c");
+const ctx=c.getContext("2d");
+c.width=innerWidth;
+c.height=innerHeight;
+
+let player={
+x:200,y:200,
+hp:100,mp:50,
+atk:10
+};
+
+let enemies=[];
+let boss=null;
+let bullets=[];
+let killCount=0;
+let gameState="play";
+
+class Enemy{
+constructor(x,y,hp=30,type="mob"){
+this.x=x;
+this.y=y;
+this.hp=hp;
+this.type=type;
+this.alive=true;
+}
+
+update(){
+if(!this.alive)return;
+
+let dx=player.x-this.x;
+let dy=player.y-this.y;
+let d=Math.hypot(dx,dy);
+
+this.x+=dx/d*0.8;
+this.y+=dy/d*0.8;
+
+if(d<25) player.hp-=0.3;
+}
+
+draw(){
+if(!this.alive)return;
+ctx.fillStyle=this.type==="boss"?"purple":"red";
+ctx.fillRect(this.x,this.y,20,20);
+}
+}
+
+class Bullet{
+constructor(x,y,tx,ty,skill=false){
+this.x=x;
+this.y=y;
+
+let dx=tx-x;
+let dy=ty-y;
+let d=Math.hypot(dx,dy);
+
+this.vx=dx/d*8;
+this.vy=dy/d*8;
+this.life=60;
+this.skill=skill;
+}
+
+update(){
+this.x+=this.vx;
+this.y+=this.vy;
+this.life--;
+}
+
+draw(){
+ctx.fillStyle=this.skill?"cyan":"yellow";
+ctx.fillRect(this.x,this.y,5,5);
+}
+}
+
+function spawnEnemy(){
+enemies.push(new Enemy(
+Math.random()*c.width,
+Math.random()*c.height
+));
+}
+
+function spawnBoss(){
+boss=new Enemy(c.width/2,c.height/2,300,"boss");
+}
+
+function startGame(){
+enemies=[];
+boss=null;
+bullets=[];
+killCount=0;
+gameState="play";
+
+for(let i=0;i<6;i++)spawnEnemy();
+
+loop();
+}
+
+function loop(){
+
+ctx.clearRect(0,0,c.width,c.height);
+
+// player
+ctx.fillStyle="cyan";
+ctx.fillRect(player.x,player.y,20,20);
+
+// enemies
+enemies.forEach(e=>{
+e.update();
+e.draw();
+});
+
+// boss
+if(boss){
+boss.update();
+boss.draw();
+}
+
+// bullets
+bullets.forEach((b,i)=>{
+b.update();
+b.draw();
+
+let targets=[...enemies];
+if(boss)targets.push(boss);
+
+targets.forEach(t=>{
+if(!t.alive)return;
+
+if(b.x>t.x&&b.x<t.x+20&&b.y>t.y&&b.y<t.y+20){
+t.hp-=player.atk;
+b.life=0;
+
+if(t.hp<=0 && t.alive){
+t.alive=false;
+
+killCount++;
+
+if(boss) player.mp+=5;
+}
+}
+});
+
+if(b.life<=0)bullets.splice(i,1);
+});
+
+// spawn boss
+if(killCount>=10 && !boss){
+spawnBoss();
+}
+
+// win condition
+if(boss && boss.hp<=0){
+gameState="win";
+}
+
+// UI
+document.getElementById("hpBar").style.width=player.hp+"%";
+document.getElementById("mpBar").style.width=player.mp+"%";
+document.getElementById("kill").innerText=killCount;
+
+// win screen
+if(gameState==="win"){
+ctx.fillStyle="rgba(0,0,0,0.7)";
+ctx.fillRect(0,0,c.width,c.height);
+
+ctx.fillStyle="white";
+ctx.font="50px Arial";
+ctx.fillText("CLEAR!",c.width/2-100,c.height/2);
+
+ctx.font="20px Arial";
+ctx.fillText("다시 시작하려면 새로고침",c.width/2-130,c.height/2+40);
+return;
+}
+
+requestAnimationFrame(loop);
+}
+
+// controls
+addEventListener("keydown",e=>{
+if(e.key==="w")player.y-=10;
+if(e.key==="s")player.y+=10;
+if(e.key==="a")player.x-=10;
+if(e.key==="d")player.x+=10;
+});
+
+c.addEventListener("click",e=>{
+bullets.push(new Bullet(player.x,player.y,e.clientX,e.clientY));
+});
+
+function saveGame(){
+localStorage.setItem("save",JSON.stringify(player));
+}
+
+function loadGame(){
+let d=JSON.parse(localStorage.getItem("save"));
+if(d)player=d;
+}
+</script>
+
+</body>
+</html>
